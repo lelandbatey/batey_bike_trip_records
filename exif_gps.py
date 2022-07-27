@@ -26,9 +26,9 @@ def parse_gps(rawgpsdict):
 def convert_gps_dms_to_degreedecimal(gpsdict):
     def dms_to_dd(degrees, minutes, seconds, dir_reference):
         direction = 1
-        if direction in ['S', 'W']:
+        if dir_reference in ['S', 'W']:
             direction = -1
-        return (float(degrees) + (float(minutes) / 60.0) + (float(seconds) / (360.0))) * direction
+        return (float(degrees) + (float(minutes) / 60.0) + (float(seconds) / (60 * 60))) * direction
 
     lat = dms_to_dd(*gpsdict['GPSLatitude'], gpsdict['GPSLatitudeRef'])
     lng = dms_to_dd(*gpsdict['GPSLongitude'], gpsdict['GPSLongitudeRef'])
@@ -77,7 +77,11 @@ def main():
         printrow = printrow_json
     elif args.format == 'CSV':
         dictwriter = csv.DictWriter(
-            sys.stdout, fieldnames=['latitude', 'longitude', 'timestamp_utc', 'filename', 'error']
+            sys.stdout,
+            fieldnames=[
+                'latitude', 'longitude', 'timestamp_utc', 'dilution_of_precision', 'filename',
+                'error'
+            ]
         )
         dictwriter.writeheader()
         printrow = lambda row: printrow_csv(dictwriter, row)
@@ -89,6 +93,7 @@ def main():
             'latitude': '',
             'longitude': '',
             'timestamp_utc': '',
+            'dilution_of_precision': '',
             'filename': imgf.name,
             'error': 'GPS data is not present'
         }
@@ -98,12 +103,19 @@ def main():
         rawexif = image.getexif()._get_merged_dict()
         if GPSKEY in rawexif:
             gpsdict = parse_gps(rawexif[GPSKEY])
+            # print(f"{gpsdict=}")
+            # print({ExifTags.TAGS[k]: v for k, v in rawexif.items()})
             lat, lng = convert_gps_dms_to_degreedecimal(gpsdict)
             timestamp = extract_gps_timestamp_utc(gpsdict)
+            dopstr = '23000/1000'
+            if 'GPSDOP' in gpsdict:
+                dop = gpsdict['GPSDOP']
+                dopstr = f"{dop.numerator}/{dop.denominator}"
             row = {
                 'latitude': round(lat, 6),
                 'longitude': round(lng, 6),
                 'timestamp_utc': int(timestamp.timestamp()),
+                'dilution_of_precision': dopstr,
                 'filename': imgf.name,
                 'error': ''
             }
