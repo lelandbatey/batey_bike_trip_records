@@ -28,12 +28,12 @@ Oroville) at around 6pm, where we stayed for the night.
 Route data:
 
 ```
-Moment,              Lat,       Lng,          Description
-2016-07-07 12:01 PT, 48.703863, -119.4391837, Started riding from the Subway
-2016-07-07 13:33 PT, 48.809069, -119.5332028, Paused and got ice-cream at the Spectacle lake resort
-2016-07-07 14:58 PT, 48.915441, -119.6330500, Paused along Palmer lake to enjoy the day
-2016-07-07 17:09 PT, 48.972719, -119.5025833, Stopped along the Similkameen river to take a picture
-2016-07-07 17:50 PT, 48.948511, -119.4326171, Approximate time we arrived at Osoyoos Lake Veteran's Memorial Park, where we stayed for the night.
+Moment,                 Lat,       Lng,          Description
+2016-07-07 12:01 -0700, 48.703863, -119.4391837, Started riding from the Subway
+2016-07-07 13:33 -0700, 48.809069, -119.5332028, Paused and got ice-cream at the Spectacle lake resort
+2016-07-07 14:58 -0700, 48.915441, -119.6330500, Paused along Palmer lake to enjoy the day
+2016-07-07 17:09 -0700, 48.972719, -119.5025833, Stopped along the Similkameen river to take a picture
+2016-07-07 17:50 -0700, 48.948511, -119.4326171, Approximate time we arrived at Osoyoos Lake Veteran's Memorial Park, where we stayed for the night.
 ```
 
 ## Day 2 - Oroville to Curlew, 54 miles

@@ -97,28 +97,36 @@ def main():
             'filename': imgf.name,
             'error': 'GPS data is not present'
         }
+        extension = imgf.name.split('.')[-1]
+        if extension.lower() in ['mp4', 'mov', 'heic', 'heif']:
+            printrow(row)
+            continue
+
         image: JpegImageFile = Image.open(imgf)
         # In order to get _all_ the EXIF data, we have to call the protected
         # `_get_merged_dict()` method, otherwise GPS EXIF isn't included
         rawexif = image.getexif()._get_merged_dict()
-        if GPSKEY in rawexif:
-            gpsdict = parse_gps(rawexif[GPSKEY])
-            # print(f"{gpsdict=}")
-            # print({ExifTags.TAGS[k]: v for k, v in rawexif.items()})
-            lat, lng = convert_gps_dms_to_degreedecimal(gpsdict)
-            timestamp = extract_gps_timestamp_utc(gpsdict)
-            dopstr = '23000/1000'
-            if 'GPSDOP' in gpsdict:
-                dop = gpsdict['GPSDOP']
-                dopstr = f"{dop.numerator}/{dop.denominator}"
-            row = {
-                'latitude': round(lat, 6),
-                'longitude': round(lng, 6),
-                'timestamp_utc': int(timestamp.timestamp()),
-                'dilution_of_precision': dopstr,
-                'filename': imgf.name,
-                'error': ''
-            }
+        try:
+            if GPSKEY in rawexif:
+                gpsdict = parse_gps(rawexif[GPSKEY])
+                # print(f"{gpsdict=}")
+                # print({ExifTags.TAGS[k]: v for k, v in rawexif.items()})
+                lat, lng = convert_gps_dms_to_degreedecimal(gpsdict)
+                timestamp = extract_gps_timestamp_utc(gpsdict)
+                dopstr = '23000/1000'
+                if 'GPSDOP' in gpsdict:
+                    dop = gpsdict['GPSDOP']
+                    dopstr = f"{dop.numerator}/{dop.denominator}"
+                row = {
+                    'latitude': round(lat, 6),
+                    'longitude': round(lng, 6),
+                    'timestamp_utc': int(timestamp.timestamp()),
+                    'dilution_of_precision': dopstr,
+                    'filename': imgf.name,
+                    'error': ''
+                }
+        except KeyError as ke:
+            pass
         printrow(row)
 
 

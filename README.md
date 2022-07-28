@@ -12,3 +12,11 @@ repo will house the hard-data and metadata used to generate galleries of
 images; it'll have everything necessary to generate the image galleries
 *except* for the images themselves.
 
+## Generate Data
+
+```
+# Generate the JSON lines GPS data:
+cat <(python exif_gps.py 2018_batey_bike_trip/images/*) <(python markdown_gps.py 2018_batey_bike_trip/2018_batey_bike_trip.md) > 2018_batey_bike_trip/2018_pictures_gps_data.json
+# Convert the GPS data into a nice map:
+cat 2018_batey_bike_trip/2018_pictures_gps_data.json | python ./create_maps.py 2018_batey_bike_trip/map_2018_bike_trip.png
+```

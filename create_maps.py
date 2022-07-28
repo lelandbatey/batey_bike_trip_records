@@ -58,7 +58,7 @@ def color_hash(obj):
         '#FF0000',  # Red
         '#FFDD00',  # Yellow
         '#00FF00',  # Green
-        '#00FFFF',  # Cyan
+        '#00CFE0',  # Cyan
         '#FF9300',  # Orange
         # Darker colors
         '#004500',  # Dark green
@@ -178,7 +178,7 @@ def bin_by_day(tlocs: List[TimeLocation]) -> Dict[str, List[TimeLocation]]:
     days = {}
     for tl in tlocs:
         ts = datetime.datetime.fromtimestamp(tl.moment)
-        ts_str = ts.strftime("%Y %m %d")
+        ts_str = ts.strftime("%Y_%m_%d")
         if not ts_str in days:
             days[ts_str] = list()
         days[ts_str].append(tl)
@@ -216,8 +216,8 @@ def draw_tlocs(
             line = staticmap.Line(coords, color, thickness)
             m.add_line(line)
 
-    draw_lines('white', 6)
-    draw_lines(linecolor, 4)
+    draw_lines('white', 8)
+    draw_lines(linecolor, 6)
 
     def draw_rawpoints(color, thickness):
         for point in orig_points:
@@ -225,8 +225,8 @@ def draw_tlocs(
             marker = staticmap.CircleMarker(pnt, color, thickness)
             m.add_marker(marker)
 
-    draw_rawpoints('white', 8)
-    draw_rawpoints(markercolor, 5)
+    draw_rawpoints('white', 9)
+    draw_rawpoints(markercolor, 7)
 
 
 def clamp_end_before_midnight(
@@ -265,7 +265,7 @@ def interpolate_timelocations(
         interpolated_tlocs.append(cur)
         if distance_on_unit_sphere(*(cur.latlngpoint()), *(nxt.latlngpoint())) > 500:
             print('Getting directions')
-            directions = gmaps.directions(cur.latlngpoint(), nxt.latlngpoint())
+            directions = gmaps.directions(cur.latlngpoint(), nxt.latlngpoint(), mode='bicycling')
             flatpoints = flatten_routes_points(directions)
             # If the timediff would span a midnight boundary, the we assume
             # that there's a time-jump and clamp the duration interp
@@ -280,6 +280,125 @@ def interpolate_timelocations(
     return interpolated_tlocs
 
 
+def lon_to_x(lng, zoom):
+    """
+    transform longitude to tile number
+    :type lng: float
+    :type zoom: int
+    :rtype: float
+    """
+    if not (-180 <= lng <= 180):
+        lng = (lng + 180) % 360 - 180
+
+    return ((lng + 180.) / 360) * pow(2, zoom)
+
+
+def lat_to_y(lat, zoom):
+    """
+    transform latitude to tile number
+    :type lat: float
+    :type zoom: int
+    :rtype: float
+    """
+    if not (-90 <= lat <= 90):
+        lat = (lat + 90) % 180 - 90
+
+    return (
+        1 - math.log(math.tan(lat * math.pi / 180) + 1 / math.cos(lat * math.pi / 180)) / math.pi
+    ) / 2 * pow(2, zoom)
+
+
+def x_to_px(self, x):
+    """
+    transform tile number to pixel on image canvas
+    :type x: float
+    :rtype: float
+    """
+    # print(f"{x=}")
+    # print(f"{self.x_center=}")
+    # print(f"{self.tile_size=}")
+    # print(f"{self.width=}")
+    px = (x - self.x_center) * self.tile_size + self.width / 2
+    return int(round(px))
+
+
+def y_to_px(self, y):
+    """
+    transform tile number to pixel on image canvas
+    :type y: float
+    :rtype: float
+    """
+    # print(f"{y=}")
+    # print(f"{self.y_center=}")
+    # print(f"{self.tile_size=}")
+    # print(f"{self.height=}")
+    px = (y - self.y_center) * self.tile_size + self.height / 2
+    return int(round(px))
+
+
+def mincoords(coords):
+    return (min(c[0] for c in coords), min(c[1] for c in coords))
+
+
+def maxcoords(coords):
+    return (max(c[0] for c in coords), max(c[1] for c in coords))
+
+
+def calc_mapinfo(m):
+    zoom = m._calculate_zoom()
+    # print(f"{zoom=}")
+    # extent has two coordinates which if rendered, are one in the top right
+    # and one in the bottom left. bottom left coord comes first of the four
+    # numbers.
+    extent = m.determine_extent(zoom)
+    # lng,lat fmt, in keeping with staticmap code we're copying
+    topright_coords = (extent[2], extent[3])
+    botmleft_coords = (extent[0], extent[1])
+
+    # Have to set center on m to correctly calculate pix positions later
+    lon_center, lat_center = (extent[0] + extent[2]) / 2, (extent[1] + extent[3]) / 2
+    m.x_center = lon_to_x(lon_center, zoom)
+    m.y_center = lat_to_y(lat_center, zoom)
+
+    topright_pix = (
+        x_to_px(m, lon_to_x(topright_coords[0], zoom)),
+        y_to_px(m, lat_to_y(topright_coords[1], zoom)),
+    )
+    botmleft_pix = (
+        x_to_px(m, lon_to_x(botmleft_coords[0], zoom)),
+        y_to_px(m, lat_to_y(botmleft_coords[1], zoom)),
+    )
+
+    # print(f"{topright_pix=}")
+    # print(f"{botmleft_pix=}")
+
+    mincorner = mincoords([topright_pix, botmleft_pix])
+    maxcorner = maxcoords([topright_pix, botmleft_pix])
+
+    height = maxcorner[1] - mincorner[1]
+    width = maxcorner[0] - mincorner[0]
+
+    # print(f"{height=}")
+    # print(f"{width=}")
+    return {
+        'feature_height': height,
+        'feature_width': width,
+        'zoom': zoom,
+    }
+
+
+def calc_output_dimensions(wh_aspect_ratio, shortside_goal_length=1000):
+    '''Returns width height'''
+    if wh_aspect_ratio < 1:
+        # taller than it is wide; width is 1000
+        width = shortside_goal_length
+        height = (1 / wh_aspect_ratio) * shortside_goal_length
+        return int(width), int(height)
+    width = wh_aspect_ratio * shortside_goal_length
+    height = shortside_goal_length
+    return int(width), int(height)
+
+
 def main():
     gmaps = googlemaps.Client(key=GMAPS_APIKEY)
     rows = list()
@@ -287,25 +406,52 @@ def main():
     for line in readfile:
         if line.strip():
             rows.append(json.loads(line))
-    m = staticmap.StaticMap(1500, 1500)
+    # this 'm' is temporary only; the real 'm' is created with dynamic
+    # dimensions for better fit later on.
+    m = staticmap.StaticMap(1000, 1000)
     rows = [r for r in rows if not 'error' in r or not r['error']]
     rows = sorted(rows, key=lambda x: x['timestamp_utc'])
 
     tlocs = [TimeLocation.fromrow(row) for row in rows]
+    # Draw to in-mem canvas so we can learn about aspect-ratioes in order to
+    # have a nicely sized output image
+    draw_tlocs(m, tlocs, tlocs)
+
+    mapinfo = calc_mapinfo(m)
+    aspect_ratio = mapinfo['feature_width'] / mapinfo['feature_height']
+    m = staticmap.StaticMap(*calc_output_dimensions(aspect_ratio))
+
     interp_tlocs = interpolate_timelocations(gmaps, tlocs)
 
     orig_day_tlocs = bin_by_day(tlocs)
     day_tlocs = bin_by_day(interp_tlocs)
 
-    for day, dtlocs in day_tlocs.items():
-        color = color_hash(day)
-        orig_dtlocs = orig_day_tlocs.get(day, list())
-        draw_tlocs(m, dtlocs, orig_dtlocs, linecolor=color, markercolor=color)
-
-    image = m.render()
     output_name = 'map.png'
     if len(sys.argv) > 1:
         output_name = sys.argv[1]
+    nameonly = '.'.join(output_name.split('.')[:-1])
+    extnonly = output_name.split('.')[-1]
+
+    for day, dtlocs in day_tlocs.items():
+        color = color_hash(day)
+        orig_dtlocs = orig_day_tlocs.get(day, list())
+
+        tmp_daymap = staticmap.StaticMap(*calc_output_dimensions(aspect_ratio))
+        draw_tlocs(tmp_daymap, dtlocs, dtlocs)
+        mapinfo = calc_mapinfo(tmp_daymap)
+        aspect_ratio = mapinfo['feature_width'] / mapinfo['feature_height']
+        daymap = staticmap.StaticMap(*calc_output_dimensions(aspect_ratio))
+
+        draw_tlocs(daymap, dtlocs, orig_dtlocs, linecolor=color, markercolor=color)
+        draw_tlocs(m, dtlocs, orig_dtlocs, linecolor=color, markercolor=color)
+
+        dayfname = f"{nameonly}_{day}.{extnonly}"
+        print(f"Rendering {dayfname}")
+        image = daymap.render()
+        image.save(dayfname)
+
+    print(f"Rendering {output_name}")
+    image = m.render()
     image.save(output_name)
 
 
